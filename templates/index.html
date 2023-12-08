@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dim">
+<head>
+    <!-- Meta tags for character set and viewport settings -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Title of the web page -->
+    <title>WGUPS Parcel Service</title>
+    
+    <!-- Include Tailwind CSS and DaisyUI CDN links -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.4/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="mx-2">
+    <!-- Page Heading -->
+    <h1 class="text-3xl font-bold mb-4 text-center text-white">Western Governors University Parcel Service (WGUPS)</h1>
+
+    <!-- Navigation Bar -->
+    <navbar class="flex items-center justify-center">
+        <!-- User input for time -->
+        <input type="text" id="userTime" name="userTime" placeholder="Enter time (HH:MM:SS):" class="input input-bordered w-full max-w-xs" required />
+
+        <!-- Buttons for checking individual or all packages -->
+        <button onclick="getStatus('solo')" class="btn btn-outline">
+            Check Solo
+        </button>
+        <button onclick="getStatus('all')" class="btn btn-outline">
+            Check All
+        </button>
+    </navbar>
+
+    <!-- Display total distance traveled -->
+    <div id="totalDistance" class="mt-4 text-center justify-center"></div>
+
+    <!-- Display package information grid -->
+    <div id="packages" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 justify-center px-2 py-2"></div>
+
+    <!-- JavaScript script for interacting with server and updating UI -->
+    <script>
+        // Function to get package status based on its current status
+        function getStatusClass(status) {
+            switch (status) {
+                case 'Delivered':
+                    return 'badge badge-primary badge-outline';
+                case 'En route':
+                    return 'badge badge-accent badge-outline';
+                case 'At Hub':
+                    return 'badge badge-secondary badge-outline';
+                default:
+                    return 'badge badge-outline';
+            }
+        }
+
+        // Function to fetch package status from the server and update UI
+        function getStatus(type) {
+            // Get user input
+            var userTime = document.getElementById("userTime").value;
+
+            // Create a new FormData object and append the user time and type
+            var formData = new FormData();
+            formData.append("userTime", userTime);
+            formData.append("type", type);
+
+            // Add packageID field only when checking solo
+            if (type === 'solo') {
+                var soloInput = prompt("Enter the numeric package ID");
+                // Check if the user entered a value
+                if (soloInput !== null) {
+                    formData.append("packageID", soloInput);
+                } else {
+                    // Handle the case where the user cancels or closes the prompt
+                    console.log("Solo check canceled.");
+                    return;
+                }
+            }
+
+            // Calculate and display the total distance
+            var totalDistanceElement = document.getElementById("totalDistance");
+
+            // Fetch data from the server using a POST request
+            fetch('/get_status', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if ('error' in data) {
+                    console.error('Error:', data.error);
+                    // Handle the error, e.g., display an error message to the user
+                } else {
+                    // If checking solo, display information for the solo package
+                    if (type === 'solo') {
+                        displaySoloPackage(data.result);
+                    } else {
+                        // If checking all packages, display information for each package
+                        displayAllPackages(data.result);
+                    }
+
+                    // Calculate and display the total distance
+                    var totalDistance = data.totalDistance;
+                    totalDistanceElement.innerHTML = `
+                        <div>
+                            <h3>Total Distance Traveled:</h3>
+                            <h2 class="text-white">${totalDistance.toFixed(2)}</h2>
+                            <h3>miles</h3>
+                        </div>`;
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+      // Function to display information for a solo package
+      function displaySoloPackage(packages) {
+          var soloPackageDiv = document.getElementById("packages");
+          soloPackageDiv.innerHTML = ""; // Clear previous content
+
+          var package = packages[0]; // Get the first element of the array
+          var packageDiv = document.createElement("div");
+          var statusClass = getStatusClass(package.status); // Get the appropriate class based on status
+
+          // Check the status and set the label accordingly
+          var deliveryLabel = package.status === 'Delivered' ? 'Delivery Time' : 'Predicted Delivery Time';
+
+          // Populate the packageDiv with package information
+          packageDiv.innerHTML = `
+              <div class="card w-full bg-base-100 shadow-xl p-2">
+                  <h2 class="card-title"><strong>ID:</strong> ${package.ID}</h2>
+                  <div class="card-body">
+                      <strong>Address:</strong> ${package.address}
+                      <strong>Departure Time:</strong> ${package.departureTime}
+                      <strong>${deliveryLabel}:</strong> ${package.deliveryTime}
+                      <div class="card-actions justify-center">
+                          <div class="${statusClass}">
+                              <strong>Status: </strong> ${package.status}
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          `;
+          soloPackageDiv.appendChild(packageDiv);
+      }
+
+      // Function to display information for all packages
+      function displayAllPackages(packages) {
+          var allPackagesDiv = document.getElementById("packages");
+          allPackagesDiv.innerHTML = ""; // Clear previous content
+
+          // Iterate through packages and create a div for each
+          packages.forEach(package => {
+              var packageDiv = document.createElement("div");
+              var statusClass = getStatusClass(package.status); // Get the appropriate class based on status
+
+              // Check the status and set the label accordingly
+              var deliveryLabel = package.status === 'Delivered' ? 'Delivery Time' : 'Predicted Delivery Time';
+
+              // Populate the packageDiv with package information
+              packageDiv.innerHTML = `
+                  <div class="card bg-base-100 shadow-xl p-2">
+                      <h2 class="card-title"><strong>ID:</strong> ${package.ID}</h2>
+                      <div class="card-body">
+                          <strong>Address:</strong> <p class="text-white"> ${package.address} </p>
+                          <strong>Departure Time:</strong> <p class="text-white"> ${package.departureTime} </p>
+                          <strong>${deliveryLabel}:</strong> <p class="text-white"> ${package.deliveryTime} </p>
+                          <div class="card-actions justify-center">
+                              <div class="${statusClass}">
+                                  <strong>Status: </strong><p>${package.status} </p>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              `;
+              allPackagesDiv.appendChild(packageDiv);
+          });
+      }
+    </script>
+</body>
+</html>
